@@ -676,15 +676,37 @@ function isIPL(name) {
   return n.includes('indian premier league') || n.includes('ipl');
 }
 
-function extractMatches(data, isUpcoming) {
+function isInternational(name, matchType) {
+  const n = (name || '').toLowerCase();
+  const t = (matchType || '').toLowerCase();
+  return t === 'international' || n.includes('test') || n.includes('odi') || n.includes('t20i');
+}
+
+function involvesIndia(m) {
+  const t1 = (m.info.team1?.teamName || '').toLowerCase();
+  const t2 = (m.info.team2?.teamName || '').toLowerCase();
+  return t1.includes('india') || t2.includes('india');
+}
+
+function withinDays(matchStartMs, days) {
+  if (!matchStartMs) return true;
+  const now = Date.now();
+  const diff = Math.abs(now - matchStartMs);
+  return diff <= days * 24 * 60 * 60 * 1000;
+}
+
+function extractMatches(data, status) {
   const ipl = [], other = [];
   (data.typeMatches || []).forEach(type => {
     (type.seriesMatches || []).forEach(sm => {
       const s = sm.seriesAdWrapper || sm;
       const name = s.seriesName || '';
-      const bucket = isIPL(name) ? ipl : other;
+      const matchType = type.matchType || '';
       (s.matches || []).forEach(m => {
-        if (m.matchInfo) bucket.push({ info: m.matchInfo, score: m.matchScore || null, isUpcoming, seriesName: name });
+        if (!m.matchInfo) return;
+        const entry = { info: m.matchInfo, score: m.matchScore || null, status, seriesName: name, matchType };
+        if (isIPL(name)) ipl.push(entry);
+        else other.push(entry);
       });
     });
   });
@@ -693,14 +715,20 @@ function extractMatches(data, isUpcoming) {
 
 async function fetchLiveMatches() {
   const data = await apiGet('/matches/v1/live');
-  const { ipl, other } = extractMatches(data, false);
-  return { ipl, other };
+  return extractMatches(data, 'live');
 }
 
-async function fetchUpcomingIPL() {
+async function fetchUpcoming() {
   try {
     const data = await apiGet('/matches/v1/upcoming');
-    return extractMatches(data, true);
+    return extractMatches(data, 'upcoming');
+  } catch { return { ipl: [], other: [] }; }
+}
+
+async function fetchRecent() {
+  try {
+    const data = await apiGet('/matches/v1/recent');
+    return extractMatches(data, 'recent');
   } catch { return { ipl: [], other: [] }; }
 }
 
@@ -714,16 +742,47 @@ async function fetchMatchCenter(matchId) {
 async function loadMatches() {
   setState({ view: 'loading', error: null });
   try {
-    const live = await fetchLiveMatches();
-    const upcoming = await fetchUpcomingIPL();
+    const [live, upcoming, recent] = await Promise.all([
+      fetchLiveMatches(),
+      fetchUpcoming(),
+      fetchRecent()
+    ]);
 
-    const iplMatches = [...live.ipl, ...upcoming.ipl];
-    const allMatches = [...live.ipl, ...live.other, ...upcoming.ipl, ...upcoming.other.slice(0, 10)];
+    // ---- IPL: ALL matches (recent + live + upcoming), no filter
+    const iplAll = [...recent.ipl, ...live.ipl, ...upcoming.ipl];
+    // Deduplicate by matchId
+    const iplSeen = new Set();
+    const iplMatches = iplAll.filter(m => {
+      if (iplSeen.has(m.info.matchId)) return false;
+      iplSeen.add(m.info.matchId);
+      return true;
+    });
+
+    // ---- Other matches: international only within 2 days OR any India match within 2 days
+    const otherAll = [...recent.other, ...live.other, ...upcoming.other];
+    const otherSeen = new Set();
+    const otherMatches = otherAll.filter(m => {
+      if (otherSeen.has(m.info.matchId)) return false;
+      const startMs = m.info.startDate ? Number(m.info.startDate) : null;
+      const inWindow = withinDays(startMs, 2);
+      const intl = isInternational(m.seriesName, m.matchType);
+      const india = involvesIndia(m);
+      if (!inWindow) return false;
+      if (!intl && !india) return false;
+      otherSeen.add(m.info.matchId);
+      return true;
+    });
+
     const hasIPL = iplMatches.length > 0;
+    const allMatches = hasIPL
+      ? [...iplMatches, ...otherMatches]
+      : otherMatches;
 
     setState({
-      matches: hasIPL ? iplMatches : allMatches,
-      iplOnly: hasIPL,
+      iplMatches,
+      otherMatches,
+      matches: allMatches,
+      hasIPL,
       view: allMatches.length === 0 ? 'noMatches' : 'matchList',
       lastUpdate: new Date()
     });
@@ -871,40 +930,63 @@ function renderNoMatches() {
 
 // ---- MATCH LIST ----
 function renderMatchList() {
-  const cards = state.matches.map(m => {
+  function makeCard(m) {
     const info = m.info;
     const t1 = info.team1?.teamSName || info.team1?.teamName || 'TBD';
     const t2 = info.team2?.teamSName || info.team2?.teamName || 'TBD';
-    const status = info.state || '';
+    const status = info.state || m.status || '';
     const venue = info.venueInfo?.ground || '';
-    const isLive = status === 'In Progress' || status.includes('Live') || status === 'live';
-    const isUpcoming = m.isUpcoming || status === 'preview' || status === 'Toss';
-    const badgeClass = isLive ? 'status-live' : isUpcoming ? 'status-upcoming' : 'status-completed';
-    const badgeLabel = isLive ? '🔴 LIVE' : isUpcoming ? '⏰ UPCOMING' : '✔ DONE';
+    const isLive = m.status === 'live' || status === 'In Progress' || status.toLowerCase().includes('live');
+    const isRecent = m.status === 'recent';
+    const isUpcoming = m.status === 'upcoming' || status === 'preview' || status === 'Toss';
+    const badgeClass = isLive ? 'status-live' : isRecent ? 'status-completed' : isUpcoming ? 'status-upcoming' : 'status-completed';
+    const badgeLabel = isLive ? '🔴 LIVE' : isRecent ? '✔ RESULT' : isUpcoming ? '⏰ UPCOMING' : '✔ DONE';
     const scoreStr = m.score ? buildScoreStr(m.score, info) : '';
-
+    const seriesTag = m.seriesName ? `<span style="font-size:11px;color:var(--accent);background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2);border-radius:4px;padding:2px 6px;margin-right:6px">${escHtml(m.seriesName)}</span>` : '';
     return `
     <div class="match-card" onclick="selectMatch(${info.matchId})">
-      <div>
+      <div style="flex:1;min-width:0">
+        <div style="margin-bottom:5px">${seriesTag}</div>
         <div class="match-card-teams">${escHtml(t1)} <span style="color:var(--dim)">vs</span> ${escHtml(t2)}</div>
         <div class="match-card-meta">${escHtml(venue)}${scoreStr ? ' &nbsp;·&nbsp; ' + escHtml(scoreStr) : ''}</div>
       </div>
-      <div class="match-card-status ${badgeClass}">${badgeLabel}</div>
+      <div class="match-card-status ${badgeClass}" style="flex-shrink:0;margin-left:12px">${badgeLabel}</div>
     </div>`;
-  }).join('');
+  }
 
-  const banner = state.iplOnly === false
-    ? `<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#fbbf24;">
-        ⏳ <b>IPL 2026 fixtures not scheduled yet</b> — showing all live &amp; upcoming cricket for now. IPL matches will auto-appear here once BCCI releases the schedule.
-      </div>`
-    : ``;
+  function sectionHeader(title, count) {
+    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 4px 6px;margin-top:18px;border-bottom:1px solid var(--border);margin-bottom:10px">${title} <span style="color:var(--dim);font-weight:400">(${count})</span></div>`;
+  }
+
+  const ipl = state.iplMatches || [];
+  const other = state.otherMatches || [];
+
+  // Split IPL by status
+  const iplRecent   = ipl.filter(m => m.status === 'recent');
+  const iplLive     = ipl.filter(m => m.status === 'live');
+  const iplUpcoming = ipl.filter(m => m.status === 'upcoming');
+
+  let html = '';
+
+  if (ipl.length > 0) {
+    html += `<div style="margin-bottom:4px;font-size:13px;color:var(--muted)">🏏 <b style="color:var(--accent)">IPL 2026</b> — all matches</div>`;
+    if (iplLive.length)     html += sectionHeader('🔴 Live', iplLive.length)     + iplLive.map(makeCard).join('');
+    if (iplUpcoming.length) html += sectionHeader('⏰ Upcoming', iplUpcoming.length) + iplUpcoming.map(makeCard).join('');
+    if (iplRecent.length)   html += sectionHeader('✔ Recent Results', iplRecent.length)  + iplRecent.map(makeCard).join('');
+  } else {
+    html += `<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#fbbf24;">
+      ⏳ <b>IPL 2026 fixtures not released yet</b> — schedule usually drops 2–3 weeks before season start (late March).
+    </div>`;
+  }
+
+  if (other.length > 0) {
+    html += sectionHeader('🌍 Other Cricket (International / India · last 2 days)', other.length);
+    html += other.map(makeCard).join('');
+  }
 
   return `
-  ${banner}
-  <div style="margin-bottom:16px;font-size:13px;color:var(--muted)">
-    ${state.iplOnly ? '🏏 IPL Matches' : 'All Cricket'} · <b style="color:var(--text)">${state.matches.length} match${state.matches.length !== 1 ? 'es' : ''}</b> · Updated ${formatTime(state.lastUpdate)}
-  </div>
-  <div id="match-list">${cards}</div>`;
+  <div style="margin-bottom:10px;font-size:12px;color:var(--muted);text-align:right">Updated ${formatTime(state.lastUpdate)}</div>
+  <div id="match-list">${html}</div>`;
 }
 
 function buildScoreStr(score, info) {
