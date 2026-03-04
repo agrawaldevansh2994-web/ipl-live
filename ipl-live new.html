@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IPL Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@300;400;500;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181c24;
+    --border: #1e2330;
+    --accent: #f97316;
+    --accent2: #fbbf24;
+    --live: #22c55e;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --dim: #374151;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(249,115,22,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(249,115,22,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 20px 16px 60px; }
+
+  /* ---- HEADER ---- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .logo {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    letter-spacing: -1px;
+    color: var(--text);
+  }
+
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 12px; }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(34,197,94,0.1);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--live);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .live-dot {
+    width: 7px; height: 7px;
+    background: var(--live);
+    border-radius: 50%;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .refresh-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: 'Barlow', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap-6px;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---- API KEY SETUP ---- */
+  #setup-screen {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  #setup-screen h2 {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  #setup-screen p { color: var(--muted); margin-bottom: 28px; font-size: 15px; line-height: 1.6; }
+
+  .setup-steps {
+    text-align: left;
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 2;
+  }
+
+  .setup-steps b { color: var(--text); }
+  .setup-steps a { color: var(--accent); text-decoration: none; }
+
+  .key-input-row { display: flex; gap: 10px; max-width: 500px; margin: 0 auto; }
+
+  .key-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .key-input:focus { border-color: var(--accent); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+
+  /* ---- MATCH SELECTOR ---- */
+  #match-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .match-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .match-card:hover { border-color: var(--accent); background: var(--surface2); }
+
+  .match-card-teams {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .match-card-meta { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .match-card-status {
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+  }
+  .status-live { background: rgba(34,197,94,0.1); color: var(--live); border: 1px solid rgba(34,197,94,0.3); }
+  .status-upcoming { background: rgba(249,115,22,0.1); color: var(--accent); border: 1px solid rgba(249,115,22,0.3); }
+  .status-completed { background: rgba(107,114,128,0.1); color: var(--muted); border: 1px solid rgba(107,114,128,0.2); }
+
+  /* ---- SCORECARD ---- */
+  #scorecard { animation: fadeUp 0.4s ease; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .back-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-family: 'Barlow', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: all 0.2s;
+  }
+  .back-btn:hover { color: var(--text); border-color: var(--dim); }
+
+  /* Scoreboard Hero */
+  .scoreboard-hero {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .scoreboard-hero::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, rgba(249,115,22,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .match-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .teams-score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .team-block { flex: 1; min-width: 180px; }
+  .team-block.right { text-align: right; }
+
+  .team-name-big {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+
+  .team-score-big {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--text);
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-top: 6px;
+  }
+
+  .team-overs {
+    font-size: 15px;
+    color: var(--muted);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .vs-divider {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--dim);
+    padding: 0 8px;
+  }
+
+  .match-status-text {
+    font-size: 14px;
+    color: var(--muted);
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-style: italic;
+  }
+
+  .match-status-text b { color: var(--accent2); font-style: normal; }
+
+  /* Innings tabs */
+  .innings-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .innings-tab {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .innings-tab.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+  /* Grid of panels */
+  .panels-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  @media (max-width: 600px) { .panels-grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .panel-full { grid-column: 1 / -1; }
+
+  .panel-header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-header .icon { font-size: 14px; }
+
+  /* Batting table */
+  .batting-table { width: 100%; border-collapse: collapse; }
+
+  .batting-table th {
+    padding: 8px 18px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .batting-table th:first-child { text-align: left; }
+
+  .batting-table td {
+    padding: 10px 18px;
+    font-size: 14px;
+    text-align: right;
+    border-bottom: 1px solid rgba(30,35,48,0.6);
+  }
+  .batting-table td:first-child { text-align: left; }
+  .batting-table tr:last-child td { border-bottom: none; }
+
+  .batsman-name { font-weight: 600; }
+  .batsman-dismissal { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .on-strike { color: var(--accent2) !important; }
+  .on-strike::after { content: ' ✦'; font-size: 10px; }
+
+  .sr-high { color: var(--live); }
+  .sr-low { color: #ef4444; }
+
+  /* Over display */
+  .over-balls {
+    display: flex;
+    gap: 8px;
+    padding: 16px 18px;
+    flex-wrap: wrap;
+  }
+
+  .ball {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    border: 2px solid;
+    transition: transform 0.2s;
+  }
+
+  .ball:hover { transform: scale(1.1); }
+  .ball-0  { background: rgba(107,114,128,0.1); border-color: var(--dim); color: var(--muted); }
+  .ball-run { background: rgba(249,115,22,0.1); border-color: rgba(249,115,22,0.4); color: var(--accent); }
+  .ball-4  { background: rgba(59,130,246,0.15); border-color: rgba(59,130,246,0.5); color: #60a5fa; }
+  .ball-6  { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.5); color: var(--live); }
+  .ball-W  { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.5); color: #f87171; }
+  .ball-W  { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.5); color: #f87171; }
+  .ball-WD, .ball-NB { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.4); color: #c084fc; font-size: 11px; }
+
+  .over-info {
+    padding: 0 18px 14px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  /* Bowling */
+  .bowling-table { width: 100%; border-collapse: collapse; }
+  .bowling-table th {
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: right;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .bowling-table th:first-child { text-align: left; }
+  .bowling-table td {
+    padding: 10px 14px;
+    font-size: 14px;
+    text-align: right;
+    border-bottom: 1px solid rgba(30,35,48,0.6);
+  }
+  .bowling-table td:first-child { text-align: left; }
+  .bowling-table tr:last-child td { border-bottom: none; }
+  .current-bowler { color: var(--accent2) !important; font-weight: 600; }
+
+  /* Playing XI */
+  .xi-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .xi-team {
+    padding: 16px 18px;
+  }
+  .xi-team:first-child { border-right: 1px solid var(--border); }
+
+  .xi-team-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .xi-player {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+
+  .xi-num {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--dim);
+    width: 18px;
+    text-align: right;
+  }
+
+  .xi-cap { font-size: 10px; color: var(--accent2); background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.3); border-radius: 4px; padding: 1px 4px; font-weight: 700; letter-spacing: 0.5px; }
+  .xi-wk { font-size: 10px; color: #60a5fa; background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 4px; padding: 1px 4px; font-weight: 700; }
+
+  /* Recent overs */
+  .recent-overs {
+    display: flex;
+    gap: 10px;
+    padding: 16px 18px;
+    overflow-x: auto;
+  }
+
+  .recent-over-block {
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    min-width: 90px;
+  }
+
+  .recent-over-num {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  .recent-over-balls { display: flex; gap: 4px; flex-wrap: wrap; }
+
+  .mini-ball {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  .recent-over-runs {
+    margin-top: 6px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+  }
+
+  /* Countdown/refresh */
+  .refresh-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .refresh-info {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .countdown-bar {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+    width: 120px;
+    display: inline-block;
+    margin: 0 8px;
+    vertical-align: middle;
+  }
+
+  .countdown-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: width 1s linear;
+  }
+
+  /* Loading / Error states */
+  .state-box {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+  .state-box .icon { font-size: 40px; margin-bottom: 12px; }
+  .state-box h3 { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; color: var(--text); margin-bottom: 6px; }
+  .state-box p { font-size: 14px; line-height: 1.6; }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Ticker */
+  .no-match-notice {
+    background: rgba(249,115,22,0.05);
+    border: 1px solid rgba(249,115,22,0.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 14px;
+    color: var(--muted);
+  }
+  .no-match-notice b { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">IPL<span>●</span>LIVE</div>
+    <div class="header-right">
+      <div class="live-badge"><div class="live-dot"></div>Live</div>
+      <button class="refresh-btn" onclick="manualRefresh()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div id="root"></div>
+</div>
+
+<script>
+// =====================================================================
+// CONFIG — paste your RapidAPI key here
+// =====================================================================
+let API_KEY = localStorage.getItem('ipl_api_key') || '';
+const API_HOST = 'cricbuzz-cricket.p.rapidapi.com';
+const POLL_INTERVAL = 60; // seconds (60s = ~500 req for ~8hrs, fits free tier)
+
+// =====================================================================
+// STATE
+// =====================================================================
+let state = {
+  view: API_KEY ? 'loading' : 'setup',
+  matches: [],
+  selectedMatch: null,
+  matchData: null,
+  error: null,
+  lastUpdate: null,
+  countdown: POLL_INTERVAL,
+  selectedInnings: 0,
+};
+
+let pollTimer = null;
+let countdownTimer = null;
+
+// =====================================================================
+// API CALLS
+// =====================================================================
+async function apiGet(path) {
+  const res = await fetch(`https://${API_HOST}${path}`, {
+    headers: {
+      'X-RapidAPI-Key': API_KEY,
+      'X-RapidAPI-Host': API_HOST,
+    }
+  });
+  const text = await res.text();
+  if (!text || text.trim() === '') {
+    throw new Error(`Empty response from API (status ${res.status}) — you may have hit your free tier limit (500 req/day). Check rapidapi.com dashboard.`);
+  }
+  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  try {
+    return JSON.parse(text);
+  } catch(e) {
+    throw new Error(`Invalid JSON from API: ${text.slice(0, 100)}`);
+  }
+}
+
+function isIPL(name) {
+  const n = (name || '').toLowerCase();
+  return n.includes('indian premier league') || n.includes('ipl');
+}
+
+function isInternational(name, matchType) {
+  const n = (name || '').toLowerCase();
+  const t = (matchType || '').toLowerCase();
+  return t === 'international' || n.includes('test') || n.includes('odi') || n.includes('t20i');
+}
+
+function involvesIndia(m) {
+  const t1 = (m.info.team1?.teamName || '').toLowerCase();
+  const t2 = (m.info.team2?.teamName || '').toLowerCase();
+  return t1.includes('india') || t2.includes('india');
+}
+
+function withinDays(matchStartMs, days) {
+  if (!matchStartMs) return true;
+  const now = Date.now();
+  const diff = Math.abs(now - matchStartMs);
+  return diff <= days * 24 * 60 * 60 * 1000;
+}
+
+function extractMatches(data, status) {
+  const ipl = [], other = [];
+  (data.typeMatches || []).forEach(type => {
+    (type.seriesMatches || []).forEach(sm => {
+      const s = sm.seriesAdWrapper || sm;
+      const name = s.seriesName || '';
+      const matchType = type.matchType || '';
+      (s.matches || []).forEach(m => {
+        if (!m.matchInfo) return;
+        const entry = { info: m.matchInfo, score: m.matchScore || null, status, seriesName: name, matchType };
+        if (isIPL(name)) ipl.push(entry);
+        else other.push(entry);
+      });
+    });
+  });
+  return { ipl, other };
+}
+
+async function fetchLiveMatches() {
+  const data = await apiGet('/matches/v1/live');
+  return extractMatches(data, 'live');
+}
+
+async function fetchUpcoming() {
+  try {
+    const data = await apiGet('/matches/v1/upcoming');
+    return extractMatches(data, 'upcoming');
+  } catch { return { ipl: [], other: [] }; }
+}
+
+async function fetchRecent() {
+  try {
+    const data = await apiGet('/matches/v1/recent');
+    return extractMatches(data, 'recent');
+  } catch { return { ipl: [], other: [] }; }
+}
+
+async function fetchMatchCenter(matchId) {
+  // Call both endpoints in parallel and merge results
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const info = await apiGet(`/mcenter/v1/${matchId}`);
+  await delay(300);
+  const scard = await apiGet(`/mcenter/v1/${matchId}/scard`).catch(() => ({}));
+  // Merge: scard has scorecard data, info has team names
+  return { ...scard, ...info, scorecard: scard.scorecard || [] };
+}
+
+// =====================================================================
+// POLL LOGIC
+// =====================================================================
+async function loadMatches() {
+  setState({ view: 'loading', error: null });
+  try {
+    const delay = ms => new Promise(r => setTimeout(r, ms));
+    const live = await fetchLiveMatches();
+    await delay(400);
+    const upcoming = await fetchUpcoming();
+    await delay(400);
+    const recent = await fetchRecent();
+
+    // ---- IPL: ALL matches (recent + live + upcoming), no filter
+    const iplAll = [...recent.ipl, ...live.ipl, ...upcoming.ipl];
+    // Deduplicate by matchId
+    const iplSeen = new Set();
+    const iplMatches = iplAll.filter(m => {
+      if (iplSeen.has(m.info.matchId)) return false;
+      iplSeen.add(m.info.matchId);
+      return true;
+    });
+
+    // ---- Other matches: international only within 2 days OR any India match within 2 days
+    const otherAll = [...recent.other, ...live.other, ...upcoming.other];
+    const otherSeen = new Set();
+    const otherMatches = otherAll.filter(m => {
+      if (otherSeen.has(m.info.matchId)) return false;
+      const startMs = m.info.startDate ? Number(m.info.startDate) : null;
+      const now = Date.now();
+      const isFuture = startMs && startMs > now;
+      const inWindow = isFuture ? withinDays(startMs, 5) : withinDays(startMs, 2);
+      const intl = isInternational(m.seriesName, m.matchType);
+      const india = involvesIndia(m);
+      if (!inWindow) return false;
+      if (!intl && !india) return false;
+      otherSeen.add(m.info.matchId);
+      return true;
+    });
+
+    const hasIPL = iplMatches.length > 0;
+    const allMatches = hasIPL
+      ? [...iplMatches, ...otherMatches]
+      : otherMatches;
+
+    setState({
+      iplMatches,
+      otherMatches,
+      matches: allMatches,
+      hasIPL,
+      view: allMatches.length === 0 ? 'noMatches' : 'matchList',
+      lastUpdate: new Date()
+    });
+  } catch(e) {
+    setState({ view: 'error', error: e.message });
+  }
+}
+
+async function loadMatchData() {
+  if (!state.selectedMatch) return;
+  const id = state.selectedMatch.info.matchId;
+  try {
+    const data = await fetchMatchCenter(id);
+    setState({ matchData: data, view: 'scorecard', error: null, lastUpdate: new Date() });
+  } catch(e) {
+    setState({ error: e.message });
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  loadMatchData();
+  pollTimer = setInterval(loadMatchData, POLL_INTERVAL * 1000);
+  startCountdown();
+}
+
+function stopPolling() {
+  clearInterval(pollTimer);
+  clearInterval(countdownTimer);
+  pollTimer = null;
+  countdownTimer = null;
+}
+
+function startCountdown() {
+  clearInterval(countdownTimer);
+  setState({ countdown: POLL_INTERVAL });
+  countdownTimer = setInterval(() => {
+    const c = state.countdown - 1;
+    setState({ countdown: c < 0 ? POLL_INTERVAL : c });
+    renderCountdown();
+  }, 1000);
+}
+
+function manualRefresh() {
+  if (state.view === 'scorecard') {
+    loadMatchData();
+    startCountdown();
+  } else {
+    loadMatches();
+  }
+}
+
+// =====================================================================
+// STATE
+// =====================================================================
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+// =====================================================================
+// RENDER
+// =====================================================================
+function render() {
+  const root = document.getElementById('root');
+  switch(state.view) {
+    case 'setup':     root.innerHTML = renderSetup(); break;
+    case 'loading':   root.innerHTML = renderLoading(); break;
+    case 'error':     root.innerHTML = renderError(); break;
+    case 'noMatches': root.innerHTML = renderNoMatches(); break;
+    case 'matchList': root.innerHTML = renderMatchList(); break;
+    case 'scorecard': root.innerHTML = renderScorecard(); break;
+  }
+}
+
+// ---- SETUP ----
+function renderSetup() {
+  return `
+  <div id="setup-screen">
+    <h2>Welcome to <span style="color:var(--accent)">IPL Live</span></h2>
+    <p>Enter your RapidAPI key to start fetching live IPL scores.<br/>All data is fetched directly from your browser — no server involved.</p>
+    <div class="setup-steps">
+      1. Go to <a href="https://rapidapi.com/cricketapilive/api/cricbuzz-cricket" target="_blank">rapidapi.com → Cricbuzz Cricket API</a><br/>
+      2. Sign up and subscribe to the <b>Basic (free)</b> plan<br/>
+      3. Copy your <b>X-RapidAPI-Key</b> from the API console<br/>
+      4. Paste it below and click Go
+    </div>
+    <div class="key-input-row">
+      <input class="key-input" id="key-input" type="password" placeholder="Paste your RapidAPI key here..." />
+      <button class="btn-primary" onclick="saveKey()">Go Live →</button>
+    </div>
+  </div>`;
+}
+
+function saveKey() {
+  const val = document.getElementById('key-input').value.trim();
+  if (!val) return;
+  API_KEY = val;
+  localStorage.setItem('ipl_api_key', val);
+  loadMatches();
+}
+
+// ---- LOADING ----
+function renderLoading() {
+  return `<div class="state-box"><div class="spinner"></div><h3>Fetching IPL matches...</h3><p>Connecting to live data</p></div>`;
+}
+
+// ---- ERROR ----
+function renderError() {
+  return `
+  <div class="state-box">
+    <div class="icon">⚠️</div>
+    <h3>Something went wrong</h3>
+    <p style="margin-bottom:16px">${escHtml(state.error || 'Unknown error')}</p>
+    <button class="btn-primary" onclick="clearKeyAndReset()">Change API Key</button>
+    &nbsp;
+    <button class="refresh-btn" style="display:inline-flex" onclick="loadMatches()">Try Again</button>
+  </div>`;
+}
+
+function clearKeyAndReset() {
+  localStorage.removeItem('ipl_api_key');
+  API_KEY = '';
+  stopPolling();
+  setState({ view: 'setup' });
+}
+
+// ---- NO MATCHES ----
+function renderNoMatches() {
+  return `
+  <div class="no-match-notice">
+    <b>No live IPL matches right now.</b><br/>
+    IPL 2025 season begins in late March. Check back when the tournament is live!
+  </div>
+  <div class="state-box">
+    <div class="icon">🏏</div>
+    <h3>No IPL matches found</h3>
+    <p>No live or upcoming IPL fixtures returned from the API.<br/>This could also mean the API subscription needs the right plan for upcoming fixtures.</p>
+    <br/>
+    <button class="refresh-btn" onclick="loadMatches()">↻ Check Again</button>
+    &nbsp;
+    <button class="refresh-btn" onclick="clearKeyAndReset()">Change API Key</button>
+  </div>`;
+}
+
+// ---- MATCH LIST ----
+function renderMatchList() {
+  function makeCard(m) {
+    const info = m.info;
+    const t1 = info.team1?.teamName || info.team1?.teamSName || 'TBD';
+    const t2 = info.team2?.teamName || info.team2?.teamSName || 'TBD';
+    const status = info.state || m.status || '';
+    const venue = info.venueInfo?.ground || '';
+    const isLive = m.status === 'live' || status === 'In Progress' || status.toLowerCase().includes('live');
+    const isRecent = m.status === 'recent';
+    const isUpcoming = m.status === 'upcoming' || status === 'preview' || status === 'Toss';
+    const badgeClass = isLive ? 'status-live' : isRecent ? 'status-completed' : isUpcoming ? 'status-upcoming' : 'status-completed';
+    const badgeLabel = isLive ? '🔴 LIVE' : isRecent ? '✔ RESULT' : isUpcoming ? '⏰ UPCOMING' : '✔ DONE';
+    const scoreStr = m.score ? buildScoreStr(m.score, info) : '';
+    const seriesTag = m.seriesName ? `<span style="font-size:11px;color:var(--accent);background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2);border-radius:4px;padding:2px 6px;margin-right:6px">${escHtml(m.seriesName)}</span>` : '';
+    return `
+    <div class="match-card" onclick="selectMatch(${info.matchId})">
+      <div style="flex:1;min-width:0">
+        <div style="margin-bottom:5px">${seriesTag}</div>
+        <div class="match-card-teams">${escHtml(t1)} <span style="color:var(--dim)">vs</span> ${escHtml(t2)}</div>
+        <div class="match-card-meta">${escHtml(venue)}${scoreStr ? ' &nbsp;·&nbsp; ' + escHtml(scoreStr) : ''}</div>
+      </div>
+      <div class="match-card-status ${badgeClass}" style="flex-shrink:0;margin-left:12px">${badgeLabel}</div>
+    </div>`;
+  }
+
+  function sectionHeader(title, count) {
+    return `<div style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding:8px 4px 6px;margin-top:18px;border-bottom:1px solid var(--border);margin-bottom:10px">${title} <span style="color:var(--dim);font-weight:400">(${count})</span></div>`;
+  }
+
+  const ipl = state.iplMatches || [];
+  const other = state.otherMatches || [];
+
+  // Split IPL by status
+  const iplRecent   = ipl.filter(m => m.status === 'recent');
+  const iplLive     = ipl.filter(m => m.status === 'live');
+  const iplUpcoming = ipl.filter(m => m.status === 'upcoming');
+
+  let html = '';
+
+  if (ipl.length > 0) {
+    html += `<div style="margin-bottom:4px;font-size:13px;color:var(--muted)">🏏 <b style="color:var(--accent)">IPL 2026</b> — all matches</div>`;
+    if (iplLive.length)     html += sectionHeader('🔴 Live', iplLive.length)     + iplLive.map(makeCard).join('');
+    if (iplUpcoming.length) html += sectionHeader('⏰ Upcoming', iplUpcoming.length) + iplUpcoming.map(makeCard).join('');
+    if (iplRecent.length)   html += sectionHeader('✔ Recent Results', iplRecent.length)  + iplRecent.map(makeCard).join('');
+  } else {
+    html += `<div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.25);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#fbbf24;">
+      ⏳ <b>IPL 2026 fixtures not released yet</b> — schedule usually drops 2–3 weeks before season start (late March).
+    </div>`;
+  }
+
+  if (other.length > 0) {
+    html += sectionHeader('🌍 Other Cricket (International / India · last 2 days)', other.length);
+    html += other.map(makeCard).join('');
+  }
+
+  return `
+  <div style="margin-bottom:10px;font-size:12px;color:var(--muted);text-align:right">Updated ${formatTime(state.lastUpdate)}</div>
+  <div id="match-list">${html}</div>`;
+}
+
+function buildScoreStr(score, info) {
+  const parts = [];
+  if (score?.team1Score?.inngs1) {
+    const s = score.team1Score.inngs1;
+    parts.push(`${info.team1?.teamSName}: ${s.runs}/${s.wickets} (${s.overs})`);
+  }
+  if (score?.team2Score?.inngs1) {
+    const s = score.team2Score.inngs1;
+    parts.push(`${info.team2?.teamSName}: ${s.runs}/${s.wickets} (${s.overs})`);
+  }
+  return parts.join(' | ');
+}
+
+function selectMatch(matchId) {
+  const m = state.matches.find(x => x.info.matchId == matchId);
+  if (!m) return;
+  setState({ selectedMatch: m, view: 'loading', matchData: null, selectedInnings: 0 });
+  startPolling();
+}
+
+function goBack() {
+  stopPolling();
+  setState({ view: 'matchList', selectedMatch: null, matchData: null });
+}
+
+// ---- SCORECARD ----
+function renderScorecard() {
+  const d = state.matchData;
+  if (!d) return renderLoading();
+
+  const miniscore = d.miniscore || {};
+  const matchInfo = d.matchInfo || {};
+  const matchHeader = d.matchHeader || {};
+  const scoreCard = d.scorecard || d.scoreCard || [];
+
+  const sel = state.selectedMatch;
+  const selInfo = sel?.info || {};
+
+  function abbrev(name) {
+    if (!name) return '';
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) return name.slice(0,3).toUpperCase();
+    return words.map(w => w[0]).join('').slice(0,4).toUpperCase();
+  }
+
+  // /mcenter/v1/{id} returns d.team1.teamname & d.team1.teamsname (all lowercase)
+  const mcT1Name  = d.team1?.teamname  || '';
+  const mcT2Name  = d.team2?.teamname  || '';
+  const mcT1Short = d.team1?.teamsname || '';
+  const mcT2Short = d.team2?.teamsname || '';
+
+  // Scorecard innings team names (available once match starts)
+  const scT1Name  = scoreCard[0]?.batteamname  || '';
+  const scT2Name  = scoreCard[1]?.batteamname  || '';
+  const scT1Short = scoreCard[0]?.batteamsname || '';
+  const scT2Short = scoreCard[1]?.batteamsname || '';
+
+  // Match list fallback
+  const selT1Name  = selInfo.team1?.teamName  || selInfo.team1?.name  || '';
+  const selT2Name  = selInfo.team2?.teamName  || selInfo.team2?.name  || '';
+  const selT1Short = selInfo.team1?.teamSName || '';
+  const selT2Short = selInfo.team2?.teamSName || '';
+
+  // Priority: scorecard > mcenter > match list > abbreviate
+  const t1 = scT1Name  || mcT1Name  || selT1Name  || 'Team 1';
+  const t2 = scT2Name  || mcT2Name  || selT2Name  || 'Team 2';
+  const t1Short = scT1Short || mcT1Short || selT1Short || abbrev(t1) || 'T1';
+  const t2Short = scT2Short || mcT2Short || selT2Short || abbrev(t2) || 'T2';
+
+  const statusMsg = d.status || d.tossstatus || matchHeader.status || miniscore.statusText || '';
+  const seriesName = d.seriesname || matchHeader.seriesName || sel?.seriesName || 'Cricket';
+  const matchNum = d.matchdesc || matchHeader.matchDescription || '';
+
+
+
+  // Innings data
+  const innings1 = scoreCard[0];
+  const innings2 = scoreCard[1];
+  const currentInnings = scoreCard[state.selectedInnings] || innings1;
+
+  // Debug: log raw data so we can see the structure if something looks off
+  console.log('matchData', JSON.stringify({
+    scoreCard: scoreCard?.map(s => ({ batTeam: s.batTeamDetails?.batTeamName, scoreDetails: s.scoreDetails, score: s.score })),
+    matchHeader: { t1: matchHeader.team1, t2: matchHeader.team2, status: matchHeader.status },
+    matchInfo: { t1: matchInfo.team1, t2: matchInfo.team2 }
+  }, null, 2));
+
+  // Hero scores (both innings summary)
+  const hero1 = buildHeroScore(scoreCard, 0);
+  const hero2 = buildHeroScore(scoreCard, 1);
+
+  // Live miniscore
+  const batTeam = miniscore.batTeam || {};
+  const bowlTeam = miniscore.bowlTeam || {};
+  const batsmanStriker = miniscore.batsmanStriker || {};
+  const batsmanNonStriker = miniscore.batsmanNonStriker || {};
+  const bowlerStriker = miniscore.bowlerStriker || {};
+  const bowlerNonStriker = miniscore.bowlerNonStriker || {};
+  const overs = miniscore.overs || '0.0';
+  const runs = batTeam.teamScore || 0;
+  const wkts = batTeam.teamWkts !== undefined ? batTeam.teamWkts : '?';
+  const target = miniscore.target || null;
+  const rrr = miniscore.currentRunRate || null;
+  const reqRate = miniscore.requiredRunRate || null;
+
+  // Current over balls
+  const overBalls = miniscore.lastSevenOvers?.split(' ') || [];
+  const currentOverStr = miniscore.currentOver || '';
+
+  // Playing XI
+  const p11 = d.Teams || {};
+  const team1XI = p11.team1?.players || [];
+  const team2XI = p11.team2?.players || [];
+  const hasXI = team1XI.length > 0 || team2XI.length > 0;
+
+  return `
+  <button class="back-btn" onclick="goBack()">← All Matches</button>
+
+  <!-- HERO -->
+  <div class="scoreboard-hero">
+    <div class="match-title">${escHtml(seriesName)} · ${escHtml(matchNum)}</div>
+    <div class="teams-score-row">
+      <div class="team-block">
+        <div class="team-name-big">${escHtml(t1Short)}</div>
+        ${hero1 ? `<div class="team-score-big">${hero1.score}</div><div class="team-overs">${hero1.overs} ov</div>` : scoreCard.length === 0 ? '<div class="team-overs" style="margin-top:8px;color:var(--accent)">Toss done</div>' : '<div class="team-overs" style="margin-top:8px">Yet to bat</div>'}
+      </div>
+      <div class="vs-divider">VS</div>
+      <div class="team-block right">
+        <div class="team-name-big">${escHtml(t2Short)}</div>
+        ${hero2 ? `<div class="team-score-big">${hero2.score}</div><div class="team-overs">${hero2.overs} ov</div>` : scoreCard.length === 0 ? '<div class="team-overs" style="margin-top:8px;color:var(--accent)">Toss done</div>' : '<div class="team-overs" style="margin-top:8px">Yet to bat</div>'}
+      </div>
+    </div>
+    ${statusMsg ? `<div class="match-status-text"><b>${escHtml(statusMsg)}</b></div>` : ''}
+    ${rrr || reqRate ? `
+    <div style="display:flex;gap:20px;margin-top:12px;font-size:13px;">
+      ${rrr ? `<span style="color:var(--muted)">CRR: <b style="color:var(--text)">${Number(rrr).toFixed(2)}</b></span>` : ''}
+      ${reqRate ? `<span style="color:var(--muted)">RRR: <b style="color:var(--accent2)">${Number(reqRate).toFixed(2)}</b></span>` : ''}
+      ${target ? `<span style="color:var(--muted)">Target: <b style="color:var(--accent)">${target}</b></span>` : ''}
+    </div>` : ''}
+  </div>
+
+  <!-- REFRESH ROW -->
+  <div class="refresh-row">
+    <div class="refresh-info">
+      Last updated ${formatTime(state.lastUpdate)} &nbsp;·&nbsp;
+      Refreshing in <span id="cd-num">${state.countdown}</span>s
+      <span class="countdown-bar"><span class="countdown-fill" id="cd-fill" style="width:${(state.countdown/POLL_INTERVAL*100)}%"></span></span>
+    </div>
+    ${scoreCard.length > 1 ? `
+    <div class="innings-tabs">
+      ${scoreCard.map((inn, i) => `
+        <button class="innings-tab ${i === state.selectedInnings ? 'active' : ''}"
+          onclick="switchInnings(${i})">
+          ${inn.batteamsname || inn.batTeamDetails?.batTeamShortName || 'INN ' + (i+1)}
+        </button>`).join('')}
+    </div>` : ''}
+  </div>
+
+  <!-- LIVE BATTING (from miniscore) -->
+  ${batsmanStriker.batName ? `
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-header"><span class="icon">🏏</span> At the Crease</div>
+    <table class="batting-table">
+      <thead><tr>
+        <th>Batter</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th>
+      </tr></thead>
+      <tbody>
+        ${renderLiveBatRow(batsmanStriker, true)}
+        ${batsmanNonStriker.batName ? renderLiveBatRow(batsmanNonStriker, false) : ''}
+      </tbody>
+    </table>
+  </div>` : ''}
+
+  <!-- CURRENT OVER -->
+  ${currentOverStr ? `
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-header"><span class="icon">◉</span> This Over · ${escHtml(bowlerStriker.bowlName || '')}</div>
+    <div class="over-balls">
+      ${currentOverStr.split(' ').filter(b=>b).map(b => renderBall(b)).join('')}
+    </div>
+    ${bowlerStriker.bowlName ? `
+    <div class="over-info">
+      ${escHtml(bowlerStriker.bowlName)}: ${bowlerStriker.bowlOvs || 0} ov · 
+      ${bowlerStriker.bowlRuns || 0} runs · 
+      ${bowlerStriker.bowlWkts || 0} wkts · 
+      Eco: ${Number(bowlerStriker.bowlEcon || 0).toFixed(2)}
+    </div>` : ''}
+  </div>` : ''}
+
+  <!-- SCORECARD PANELS -->
+  ${renderScorecardPanels(currentInnings)}
+
+  <!-- PLAYING XI -->
+  ${hasXI ? renderPlayingXI(p11.team1, p11.team2, t1, t2) : ''}
+
+  <!-- RECENT OVERS -->
+  ${renderRecentOvers(currentInnings)}
+  `;
+}
+
+function buildHeroScore(scoreCard, idx) {
+  const inn = scoreCard[idx];
+  if (!inn) return null;
+  // Correct API fields: inn.score (runs), inn.wickets, inn.overs
+  if (inn.score !== undefined) {
+    return {
+      score: `${inn.score}/${inn.wickets}`,
+      overs: inn.overs || '0.0'
+    };
+  }
+  // Fallback for live match structure
+  const s = inn.scoreDetails;
+  if (s) return { score: `${s.runs}/${s.wickets}`, overs: s.overs || '0.0' };
+  return null;
+}
+
+function getTeamName(matchInfo, matchHeader, side) {
+  // Try multiple paths, avoid garbage like "TEA"
+  const candidates = [
+    matchInfo?.[side]?.name,
+    matchHeader?.[side]?.name,
+    matchInfo?.[side]?.teamName,
+    matchHeader?.[side]?.teamName,
+  ].filter(Boolean);
+  // Pick longest (most complete) name
+  return candidates.sort((a,b) => b.length - a.length)[0] || (side === 'team1' ? 'Team 1' : 'Team 2');
+}
+
+function getTeamShort(matchInfo, matchHeader, side) {
+  const candidates = [
+    matchInfo?.[side]?.shortName,
+    matchHeader?.[side]?.shortName,
+    matchInfo?.[side]?.teamSName,
+    matchHeader?.[side]?.teamSName,
+  ].filter(n => n && n.length >= 2 && n.length <= 5 && n !== 'TEA');
+  if (candidates.length) return candidates[0];
+  // Fallback: abbreviate full name
+  const full = getTeamName(matchInfo, matchHeader, side);
+  return full.split(' ').map(w => w[0]).join('').slice(0,3).toUpperCase();
+}
+
+function renderLiveBatRow(bat, isStriker) {
+  const sr = bat.batBalls > 0 ? ((bat.batRuns / bat.batBalls) * 100).toFixed(1) : '0.0';
+  const srClass = parseFloat(sr) >= 150 ? 'sr-high' : parseFloat(sr) < 100 ? 'sr-low' : '';
+  return `
+  <tr>
+    <td><span class="batsman-name ${isStriker ? 'on-strike' : ''}">${escHtml(bat.batName || '—')}</span></td>
+    <td><b>${bat.batRuns ?? '—'}</b></td>
+    <td>${bat.batBalls ?? '—'}</td>
+    <td>${bat.batFours ?? '—'}</td>
+    <td>${bat.batSixes ?? '—'}</td>
+    <td class="${srClass}">${sr}</td>
+  </tr>`;
+}
+
+function renderScorecardPanels(inn) {
+  if (!inn) return '';
+  // Correct API: inn.batsman (array), inn.bowler (array), inn.batteamname
+  const batters = inn.batsman || Object.values(inn.batTeamDetails?.batsmenData || {});
+  const bowlers = inn.bowler  || Object.values(inn.bowlTeamDetails?.bowlersData || {});
+  const batTeamName = inn.batteamname || inn.batTeamDetails?.batTeamName || '';
+
+  // Bowling team = the OTHER innings' bat team
+  const scoreCard = state.matchData?.scorecard || state.matchData?.scoreCard || [];
+  const innIdx = scoreCard.indexOf(inn);
+  const bowlTeamName = scoreCard[innIdx === 0 ? 1 : 0]?.batteamname || inn.bowlTeamDetails?.bowlTeamName || '';
+
+  const battingRows = batters.map(b => {
+    // API fields: b.name, b.runs, b.balls, b.fours, b.sixes, b.strkrate, b.outdec
+    const balls = b.balls ?? b.ballsPlayed ?? 0;
+    const runs  = b.runs ?? 0;
+    const sr = balls > 0 ? Number(b.strkrate || (runs/balls*100)).toFixed(1) : '—';
+    const srClass = parseFloat(sr) >= 150 ? 'sr-high' : parseFloat(sr) < 100 && balls > 5 ? 'sr-low' : '';
+    const dismissal = b.outdec || b.outDesc || 'not out';
+    const isNotOut = !b.outdec && !b.outDesc;
+    return `
+    <tr>
+      <td>
+        <div class="batsman-name">${escHtml(b.name || b.batName || '—')}</div>
+        <div class="batsman-dismissal">${escHtml(dismissal)}</div>
+      </td>
+      <td><b style="${isNotOut ? 'color:var(--live)' : ''}">${runs}</b></td>
+      <td>${balls}</td>
+      <td>${b.fours ?? '—'}</td>
+      <td>${b.sixes ?? '—'}</td>
+      <td class="${srClass}">${sr}</td>
+    </tr>`;
+  }).join('');
+
+  const bowlingRows = bowlers.map(b => {
+    // API fields: b.name, b.overs, b.maidens, b.runs, b.wickets, b.economy (or strkrate)
+    const eco = b.economy !== undefined ? Number(b.economy).toFixed(2)
+              : b.econ    !== undefined ? Number(b.econ).toFixed(2) : '—';
+    const ecoStyle = parseFloat(eco) < 8 ? 'color:var(--live)' : parseFloat(eco) > 12 ? 'color:#f87171' : '';
+    return `
+    <tr>
+      <td class="batsman-name">${escHtml(b.name || b.bowlName || '—')}</td>
+      <td>${b.overs ?? '—'}</td>
+      <td>${b.maidens ?? b.maiden ?? 0}</td>
+      <td>${b.runs ?? '—'}</td>
+      <td><b>${b.wickets ?? b.wkts ?? 0}</b></td>
+      <td style="${ecoStyle}">${eco}</td>
+    </tr>`;
+  }).join('');
+
+  // Extras
+  const ex = inn.extras || {};
+  const extrasStr = ex.total !== undefined
+    ? `Extras: ${ex.total} (w ${ex.wides||0}, nb ${ex.noBalls||0}, b ${ex.byes||0}, lb ${ex.legByes||0})`
+    : '';
+
+  return `
+  <div class="panels-grid">
+    <div class="panel panel-full">
+      <div class="panel-header"><span class="icon">🏏</span> Batting — ${escHtml(batTeamName)}
+        <span style="margin-left:auto;font-weight:400;color:var(--text);font-size:14px">${inn.score ?? ''}/${inn.wickets ?? ''} (${inn.overs ?? ''} ov)</span>
+      </div>
+      ${batters.length ? `
+      <table class="batting-table">
+        <thead><tr><th>Batter</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr></thead>
+        <tbody>${battingRows}</tbody>
+      </table>
+      ${extrasStr ? `<div style="padding:8px 18px;font-size:12px;color:var(--muted);border-top:1px solid var(--border)">${extrasStr}</div>` : ''}
+      ` : '<div style="padding:16px;color:var(--muted);font-size:14px">No batting data yet</div>'}
+    </div>
+    <div class="panel panel-full">
+      <div class="panel-header"><span class="icon">⚾</span> Bowling — ${escHtml(bowlTeamName)}</div>
+      ${bowlers.length ? `
+      <table class="bowling-table">
+        <thead><tr><th>Bowler</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Eco</th></tr></thead>
+        <tbody>${bowlingRows}</tbody>
+      </table>` : '<div style="padding:16px;color:var(--muted);font-size:14px">No bowling data yet</div>'}
+    </div>
+  </div>`;
+}
+
+function renderPlayingXI(t1, t2, t1Name, t2Name) {
+  const p1 = Object.values(t1?.players || {});
+  const p2 = Object.values(t2?.players || {});
+  if (!p1.length && !p2.length) return '';
+
+  const renderPlayers = (players) => players.map((p, i) => {
+    const tags = [];
+    if (p.captain) tags.push('<span class="xi-cap">C</span>');
+    if (p.wkkeeper) tags.push('<span class="xi-wk">WK</span>');
+    return `<div class="xi-player"><span class="xi-num">${i+1}</span>${escHtml(p.fullName || p.name || '—')} ${tags.join(' ')}</div>`;
+  }).join('');
+
+  return `
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-header"><span class="icon">👥</span> Playing XI</div>
+    <div class="xi-grid">
+      <div class="xi-team">
+        <div class="xi-team-name">${escHtml(t1Name || 'Team 1')}</div>
+        ${p1.length ? renderPlayers(p1) : '<div style="font-size:13px;color:var(--muted)">Not announced</div>'}
+      </div>
+      <div class="xi-team">
+        <div class="xi-team-name">${escHtml(t2Name || 'Team 2')}</div>
+        ${p2.length ? renderPlayers(p2) : '<div style="font-size:13px;color:var(--muted)">Not announced</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderRecentOvers(inn) {
+  const overs = inn?.overSummaryList || inn?.overSummary;
+  if (!overs || !overs.length) return '';
+
+  const recent = [...overs].reverse().slice(0, 6);
+
+  return `
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-header"><span class="icon">📊</span> Recent Overs</div>
+    <div class="recent-overs">
+      ${recent.map(o => {
+        const balls = (o.score || '').split(' ').filter(b=>b);
+        const runs = balls.reduce((sum, b) => {
+          if (b === 'W') return sum;
+          if (b === 'WD' || b === 'NB') return sum + 1;
+          return sum + (parseInt(b) || 0);
+        }, 0);
+        return `
+        <div class="recent-over-block">
+          <div class="recent-over-num">OV ${o.overNum}</div>
+          <div class="recent-over-balls">
+            ${balls.map(b => `<div class="mini-ball ${getMiniClass(b)}">${b}</div>`).join('')}
+          </div>
+          <div class="recent-over-runs">${runs}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function renderBall(b) {
+  let cls = 'ball-run';
+  if (b === '0') cls = 'ball-0';
+  else if (b === '4') cls = 'ball-4';
+  else if (b === '6') cls = 'ball-6';
+  else if (b === 'W') cls = 'ball-W';
+  else if (b === 'WD') cls = 'ball-WD';
+  else if (b === 'NB') cls = 'ball-NB';
+  return `<div class="ball ${cls}">${b}</div>`;
+}
+
+function getMiniClass(b) {
+  if (b === '0') return 'ball-0';
+  if (b === '4') return 'ball-4';
+  if (b === '6') return 'ball-6';
+  if (b === 'W') return 'ball-W';
+  if (b === 'WD' || b === 'NB') return 'ball-WD';
+  return 'ball-run';
+}
+
+// ---- COUNTDOWN UPDATE (lightweight, no full re-render) ----
+function renderCountdown() {
+  const num = document.getElementById('cd-num');
+  const fill = document.getElementById('cd-fill');
+  if (num) num.textContent = state.countdown;
+  if (fill) fill.style.width = (state.countdown / POLL_INTERVAL * 100) + '%';
+}
+
+function switchInnings(i) {
+  state.selectedInnings = i;
+  render();
+}
+
+// =====================================================================
+// UTILS
+// =====================================================================
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function formatTime(d) {
+  if (!d) return '—';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// =====================================================================
+// BOOT
+// =====================================================================
+render();
+if (API_KEY) loadMatches();
+</script>
+</body>
+</html>
